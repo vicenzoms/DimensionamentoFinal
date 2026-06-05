@@ -450,7 +450,7 @@ elif choice == menu[2]:
     with col2:
         st.markdown("#### 🖨️ Peças Impressas em 3D")
         L_3d = st.number_input("Lambda 3D (maior fragilidade):", min_value=0.0000, value=0.08, step=0.01, format="%.6f", key="l_3d")
-        T_3d = st.number_input("Tempo de impressão (t):", min_value=1, value=1, step=1, key="t_3d")
+        T_3d = st.number_input("Tempo de impressão (t):", min_value=0, value=1, step=1, key="t_3d")
         C_3d = st.number_input("Custo de Impressão (R$):", min_value=0.00, value=100.00, step=10.00, format="%.2f", key="c_3d")
         
     st.divider()
