@@ -444,7 +444,7 @@ elif choice == menu[2]:
     with col1:
         st.markdown("#### ⚙️ Peças Tradicionais")
         L_trad = st.number_input("Lambda Tradicional:", min_value=0.0000, value=0.05, step=0.01, format="%.6f", key="l_trad")
-        T_trad = st.number_input("Tempo de reposição (t):", min_value=1, value=5, step=1, key="t_trad")
+        T_trad = st.number_input("Tempo de reposição (t):", min_value=0.01, value=5, step=1, key="t_trad")
         C_trad = st.number_input("Custo Unitário (R$):", min_value=0.00, value=500.00, step=10.00, format="%.2f", key="c_trad")
         
     with col2:
