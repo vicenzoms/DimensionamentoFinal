@@ -35,13 +35,13 @@ LOGO_HTML = f'<img src="data:image/png;base64,{LOGO_BASE64}" class="login-logo">
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
+# ==========================================
 # TELA DE LOGIN 
-
+# ==========================================
 if not st.session_state.authenticated:
     st.markdown(
         f"""
         <style>
-        /* Oculta menus padrão do Streamlit no ecrã de login */
         html, body, [data-testid="stAppViewContainer"], .stApp {{
             height: 100%;
             overflow: hidden !important;
@@ -53,7 +53,6 @@ if not st.session_state.authenticated:
         .main, .stApp {{ background: transparent !important; }}
         .block-container {{ max-width: 100% !important; padding: 0 !important; margin: 0 !important; }}
 
-        /* Fundo claro com gradiente sobre a imagem */
         .login-bg-full {{
             position: fixed;
             inset: 0;
@@ -92,7 +91,7 @@ if not st.session_state.authenticated:
             font-size: 1.8rem;
             font-weight: 700;
             letter-spacing: -0.02em;
-            color: #388E3C; /* Verde Material */
+            color: #388E3C;
             font-family: 'Roboto', sans-serif;
         }}
         
@@ -102,7 +101,6 @@ if not st.session_state.authenticated:
             margin-top: 5px;
         }}
 
-        /* Estilo do Cartão (Material Design Branco) */
         div[data-testid="stForm"] {{
             background: #ffffff !important;
             border-radius: 8px !important;
@@ -123,7 +121,6 @@ if not st.session_state.authenticated:
         }}
         div[data-testid="stForm"] input:focus {{ border-color: #388E3C !important; box-shadow: 0 0 0 1px #388E3C !important; }}
 
-        /* Botão Material Green */
         .stFormSubmitButton > button {{
             width: 100% !important;
             min-height: 2.8rem !important;
@@ -154,7 +151,6 @@ if not st.session_state.authenticated:
     st.markdown('<div class="login-bg-full"></div>', unsafe_allow_html=True)
     st.markdown('<div class="login-page-content">', unsafe_allow_html=True)
 
-    # Colunas para centralizar o formulário na tela
     col_vazia1, col_login, col_vazia2 = st.columns([1, 1.2, 1])
 
     with col_login:
@@ -185,7 +181,9 @@ if not st.session_state.authenticated:
     st.stop()  
 
 
-# CSS DA TELA PRINCIPAL (Pós-Login - Estilo Verde)
+# ==========================================
+# CSS DA TELA PRINCIPAL (Pós-Login)
+# ==========================================
 st.markdown("""
     <style>
     .stApp { background-color: #fdfdfd; }
@@ -214,7 +212,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# FUNÇÕES AUXILIARES
+# ==========================================
+# FUNÇÕES MATEMÁTICAS
+# ==========================================
 def calcular_poisson(lmbda, n, t, risco_alvo):
     m = lmbda * n * t
     x = 0
@@ -283,27 +283,10 @@ def calcular_normal(lmbda, n, t, risco_alvo):
     })
     return df, x_ideal, sigma
 
-def exibir_resumo_streamlit(df, x_alvo, titulo, texto_destaque="Quantidade Recomendada", mostrar_contexto=True):
-    """Exibe o DataFrame formatado. Se mostrar_contexto for False, exibe apenas a linha do x_alvo."""
-    st.subheader(titulo)
-    
-    if mostrar_contexto:
-        # Pega a linha antes, a linha alvo e a linha depois para mostrar contexto (Usado no Optimizer)
-        idx_inicio = max(0, x_alvo - 1)
-        resumo = df.iloc[idx_inicio : x_alvo + 2].copy()
-    else:
-        # Pega apenas a linha onde x é igual ao x_alvo (Usado no Analytical)
-        resumo = df[df['x'] == x_alvo].copy()
-    
-    resumo['P(X=x)'] = resumo['P(X=x)'].apply(lambda v: f"{v:.4%}")
-    resumo['Margem Seg.'] = resumo['Margem Seg.'].apply(lambda v: f"{v:.4%}")
-    resumo['Risco'] = resumo['Risco'].apply(lambda v: f"{v:.4%}")
-    
-    st.success(f"**{texto_destaque}:** {x_alvo} peças")
-    st.dataframe(resumo, use_container_width=True, hide_index=True)
 
-
+# ==========================================
 # INTERFACE PRINCIPAL
+# ==========================================
 col_img1, col_img2, col_img3 = st.columns(3)
 try:
     foto = Image.open('randomen.png')
@@ -313,84 +296,17 @@ except Exception:
 
 st.markdown("<h2 style='text-align: center; color: #388E3C;'>Spare Parts Inventory Sizing System</h2>", unsafe_allow_html=True)
 
-menu = ["Analytical", "Optimizer", "Optimizer MA"]
+menu = ["Default", "Additive Maintenance"]
 choice = st.sidebar.selectbox("Select here", menu)
 
-
-#  ANALYTICAL
-
+# ------------------------------------------
+# MODO 1: DEFAULT
+# ------------------------------------------
 if choice == menu[0]:
     st.header(menu[0])
     
-    st.subheader("Avaliação da Situação Atual do Sistema")
-    st.write("Insira a quantidade de peças sobressalentes em uso e os parâmetros operacionais para calcular a margem de segurança e o custo atual.")
-    
-    # BARRAS DE INPUT
-    Q_atual = st.number_input("Quantidade atual de peças Sobressalentes (x):", min_value=0, value=5, step=1)
-    L = st.number_input("Lambda (taxa de falha):", min_value=0.0000, value=0.05, step=0.01, format="%.6f")
-    N = st.number_input("Número de máquinas ativas (n):", min_value=1, value=10, step=1)
-    T = st.number_input("Tempo de reposição (t):", min_value=1, value=1, step=1)
-    custo_unitario = st.number_input("Custo Unitário por Peça (R$):", min_value=0.00, value=150.00, step=10.00, format="%.2f")
-    
-    botao_analytical = st.button("Calcular Situação Atual")
-    
-    if botao_analytical:
-        m_val = L * N * T
-        LG = L * N
-        custo_total = Q_atual * custo_unitario
-        
-        st.subheader("Parâmetros do Sistema")
-        col_m1, col_m2 = st.columns(2)
-        col_m1.metric("Valor Esperado de Falhas (m)", f"{m_val:.2f}")
-        col_m2.metric("Custo Total (Inventário Atual)", f"R$ {custo_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-        st.divider()
-        
-        # Gerar DataFrame de Poisson até Q_atual para exibir na tabela
-        lista_x, lista_p, lista_margem, lista_risco = [], [], [], []
-        prob_acumulada = 0
-        for x in range(Q_atual + 1):
-            p_x = poisson.pmf(x, m_val)
-            prob_acumulada += p_x
-            lista_x.append(x)
-            lista_p.append(p_x)
-            lista_margem.append(prob_acumulada)
-            lista_risco.append(max(1 - prob_acumulada, 0.0))
-        df_p_analitico = pd.DataFrame({'x': lista_x, 'P(X=x)': lista_p, 'Margem Seg.': lista_margem, 'Risco': lista_risco})
-        
-        # Exibição
-        col_t1, col_t2 = st.columns(2)
-        
-        with col_t1:
-            exibir_resumo_streamlit(df_p_analitico, Q_atual, "Distribuição de Poisson", texto_destaque="Quantidade Atual", mostrar_contexto=False)
-            
-        with col_t2:
-            if LG >= 20:
-                # Gerar DataFrame da Normal até Q_atual
-                lista_x_n, lista_p_n, lista_margem_n, lista_risco_n = [], [], [], []
-                sigma = np.sqrt(m_val)
-                for x in range(Q_atual + 1):
-                    prob_acum_n = norm.cdf(x, loc=m_val, scale=sigma)
-                    p_x_n = prob_acum_n if x == 0 else prob_acum_n - norm.cdf(x - 1, loc=m_val, scale=sigma)
-                    lista_x_n.append(x)
-                    lista_p_n.append(p_x_n)
-                    lista_margem_n.append(prob_acum_n)
-                    lista_risco_n.append(max(1 - prob_acum_n, 0.0))
-                df_n_analitico = pd.DataFrame({'x': lista_x_n, 'P(X=x)': lista_p_n, 'Margem Seg.': lista_margem_n, 'Risco': lista_risco_n})
-                
-                exibir_resumo_streamlit(df_n_analitico, Q_atual, "Aproximação Normal", texto_destaque="Quantidade Atual", mostrar_contexto=False)
-            else:
-                st.subheader("Aproximação Normal")
-                st.warning("Aproximação pela Normal não recomendada.")
-
-
-# OPTIMIZER 
-
-elif choice == menu[1]:
-    st.header(menu[1])
-    
     st.subheader("Insert the parameter values below:")
     
-    # BARRAS DE INPUT 
     L = st.number_input("Lambda (taxa de falha):", min_value=0.0000, value=0.05, step=0.01, format="%.6f")
     N = st.number_input("Número de máquinas ativas (n):", min_value=1, value=10, step=1)
     T = st.number_input("Tempo de reposição (t):", min_value=1, value=1, step=1)
@@ -413,32 +329,42 @@ elif choice == menu[1]:
         col_m1, col_m2, col_m3 = st.columns(3)
         col_m1.metric("Valor Esperado de Falhas (m)", f"{m_val:.2f}")
         col_m2.metric("Risco Alvo", f"{R_PCT}%")
-        col_m3.metric("Custo Total (Inventário Ótimo)", f"R$ {custo_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        col_m3.metric("Custo Total", f"R$ {custo_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
 
         st.divider()
+
+        def exibir_resumo_streamlit(df, x_alvo, titulo):
+            st.subheader(titulo)
+            
+            idx_inicio = max(0, x_alvo - 1)
+            resumo = df.iloc[idx_inicio : x_alvo + 2].copy()
+            
+            resumo['P(X=x)'] = resumo['P(X=x)'].apply(lambda v: f"{v:.4%}")
+            resumo['Margem Seg.'] = resumo['Margem Seg.'].apply(lambda v: f"{v:.4%}")
+            resumo['Risco'] = resumo['Risco'].apply(lambda v: f"{v:.4%}")
+            
+            st.success(f"**Quantidade Recomendada:** {x_alvo} peças")
+            st.dataframe(resumo, use_container_width=True, hide_index=True)
 
         col_tabela1, col_tabela2 = st.columns(2)
         
         with col_tabela1:
-            exibir_resumo_streamlit(df_p, x_p, "Distribuição de Poisson", mostrar_contexto=True)
+            exibir_resumo_streamlit(df_p, x_p, "Distribuição de Poisson")
             
         with col_tabela2:
             if LG >= 20:
-                exibir_resumo_streamlit(df_n, x_n, "Aproximação Normal", mostrar_contexto=True)
+                exibir_resumo_streamlit(df_n, x_n, "Aproximação Normal")
             else:
-                st.subheader("Aproximação Normal")
                 st.warning("Aproximação pela Normal não recomendada.")
 
-
-# ==========================================
-# MODO 3: OPTIMIZER MA (MANUTENÇÃO ADITIVA)
-# ==========================================
-elif choice == menu[2]:
-    st.header(menu[2])
-    st.subheader("Otimização com Manutenção Aditiva (Mix de Peças)")
-    st.write("Determine a combinação ótima entre peças tradicionais e impressas em 3D para minimizar custos, respeitando o risco alvo.")
+# ------------------------------------------
+# MODO 2: ADDITIVE MAINTENANCE (NOVA LÓGICA)
+# ------------------------------------------
+elif choice == menu[1]:
+    st.header(menu[1])
+    st.subheader("Otimização com Manutenção Aditiva (Abordagem de Tampão)")
+    st.write("Aplica um limite mínimo de segurança com peças tradicionais e atinge o risco alvo completando com peças impressas em 3D.")
     
-    # Criar colunas para organizar os inputs
     col1, col2 = st.columns(2)
     
     with col1:
@@ -450,19 +376,16 @@ elif choice == menu[2]:
     with col2:
         st.markdown("#### 🖨️ Peças Impressas em 3D")
         L_3d = st.number_input("Lambda 3D (maior fragilidade):", min_value=0.0000, value=0.08, step=0.01, format="%.6f", key="l_3d")
-        T_3d = st.number_input("Tempo de impressão (t):", min_value=0, value=1, step=1, key="t_3d")
+        T_3d = st.number_input("Tempo de impressão (t):", min_value=1, value=1, step=1, key="t_3d")
         C_3d = st.number_input("Custo de Impressão (R$):", min_value=0.00, value=100.00, step=10.00, format="%.2f", key="c_3d")
         
     st.divider()
     st.markdown("#### 📊 Parâmetros Globais do Sistema")
-    col3, col4, col5 = st.columns(3)
+    col3, col4 = st.columns(2)
     with col3:
         N_maq = st.number_input("Número de máquinas ativas (n):", min_value=1, value=10, step=1, key="n_maq_ma")
     with col4:
         R_PCT_MA = st.number_input("Risco Alvo (%):", min_value=0.01, max_value=99.99, value=5.00, step=1.0, format="%.2f", key="r_pct_ma")
-    with col5:
-        # Novo campo para evitar o travamento!
-        limite_busca = st.number_input("Limite máx. de peças testadas:", min_value=10, value=150, step=10, help="Limita o processamento para não travar o sistema. Aumente se não achar solução.")
 
     st.subheader("Clique no botão abaixo para calcular o Mix Ótimo:")    
     botao_ma = st.button("Calcular Mix Ótimo MA")
@@ -470,71 +393,77 @@ elif choice == menu[2]:
     if botao_ma:
         risco_alvo = R_PCT_MA / 100.0
         
-        melhor_custo = float('inf')
-        melhor_mix = None
-        melhor_risco = 1.0
-        melhor_m = 0.0
-        
-        # Colocamos um "spinner" visual para você saber que ele está calculando e não travou
-        with st.spinner('Processando milhares de combinações...'):
-            custo_minimo_possivel = min(C_trad, C_3d)
+        with st.spinner('A calcular base de segurança e tampão aditivo...'):
+            # PASSO 1: Descobrir o número ótimo (X) caso o sistema usasse APENAS peças tradicionais
+            df_trad, x_opt_trad, m_trad_puro = calcular_poisson(L_trad, N_maq, T_trad, risco_alvo)
             
-            # Substituímos o while True pelo limite seguro definido no input
-            for total_pecas in range(1, int(limite_busca) + 1):
+            # PASSO 2: Definir a nossa base sólida como sendo X/2 (divisão inteira, arredondada para baixo)
+            x_trad_base = x_opt_trad // 2
+            
+            m_3d_puro = L_3d * N_maq * T_3d
+            
+            # PASSO 3: A partir dessa base, adicionar peças 3D até bater o Risco Alvo
+            x_3d = 0
+            melhor_risco = 1.0
+            melhor_m = 0.0
+            
+            while True:
+                total_pecas = x_trad_base + x_3d
                 
-                # Se já achamos uma combinação onde a peça mais barata possível 
-                # multiplicada pelo total já é mais cara que o melhor achado, paramos.
-                if total_pecas * custo_minimo_possivel >= melhor_custo:
+                # Previne erro de divisão por zero caso o x_trad_base seja 0
+                if total_pecas == 0:
+                    x_3d += 1
+                    continue
+                
+                # Proporção do inventário
+                prop_trad = x_trad_base / total_pecas
+                prop_3d = x_3d / total_pecas
+                
+                # Valor Esperado Equivalente Ponderado
+                m_equivalente = (prop_trad * m_trad_puro) + (prop_3d * m_3d_puro)
+                
+                # Calcula a probabilidade conjunta
+                prob_acumulada = poisson.cdf(total_pecas, m_equivalente)
+                risco_atual = max(1.0 - prob_acumulada, 0.0)
+                
+                # Se alcançamos a meta, o loop para
+                if risco_atual <= risco_alvo:
+                    melhor_risco = risco_atual
+                    melhor_m = m_equivalente
                     break
                     
-                for x_trad in range(total_pecas + 1):
-                    x_3d = total_pecas - x_trad
-                    custo_atual = (x_trad * C_trad) + (x_3d * C_3d)
-                    
-                    if custo_atual >= melhor_custo:
-                        continue
-                        
-                    prop_trad = x_trad / total_pecas
-                    prop_3d = x_3d / total_pecas
-                    
-                    m_trad_puro = L_trad * N_maq * T_trad
-                    m_3d_puro = L_3d * N_maq * T_3d
-                    m_equivalente = (prop_trad * m_trad_puro) + (prop_3d * m_3d_puro)
-                    
-                    prob_acumulada = poisson.cdf(total_pecas, m_equivalente)
-                    risco_atual = max(1.0 - prob_acumulada, 0.0)
-                    
-                    if risco_atual <= risco_alvo:
-                        melhor_custo = custo_atual
-                        melhor_mix = (x_trad, x_3d)
-                        melhor_risco = risco_atual
-                        melhor_m = m_equivalente
+                x_3d += 1
+                
+                # Trava de segurança no código (apenas para evitar loops infinitos)
+                if x_3d > 5000:
+                    st.error("O sistema não convergiu. Tente rever os parâmetros de input.")
+                    break
 
-        # Apresentação dos Resultados Visuais
-        if melhor_mix is not None:
-            st.success("✅ Combinação ótima encontrada com sucesso!")
-            
-            st.subheader("Resultados da Otimização")
-            res_col1, res_col2, res_col3 = st.columns(3)
-            
-            res_col1.metric("Peças Tradicionais", f"{melhor_mix[0]} unid.")
-            res_col2.metric("Peças 3D (Aditivas)", f"{melhor_mix[1]} unid.")
-            res_col3.metric("Total de Peças", f"{melhor_mix[0] + melhor_mix[1]} unid.")
-            
-            st.divider()
-            
-            indicadores_col1, indicadores_col2, indicadores_col3 = st.columns(3)
-            indicadores_col1.metric("Valor Esperado Falhas (m ponderado)", f"{melhor_m:.2f}")
-            indicadores_col2.metric("Risco Obtido", f"{melhor_risco:.4%}")
-            indicadores_col3.metric("Custo Total Mínimo", f"R$ {melhor_custo:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-            
-            df_resultado = pd.DataFrame({
-                "Tipo": ["Tradicional", "Impressão 3D"],
-                "Quantidade": [melhor_mix[0], melhor_mix[1]],
-                "Custo Unitário (R$)": [C_trad, C_3d],
-                "Subtotal (R$)": [melhor_mix[0] * C_trad, melhor_mix[1] * C_3d]
-            })
-            st.dataframe(df_resultado, use_container_width=True, hide_index=True)
-            
-        else:
-            st.error(f"❌ Não foi possível encontrar uma solução segura testando até {limite_busca} peças no total. Tente aumentar o limite de busca ou alterar os parâmetros.")
+            melhor_custo = (x_trad_base * C_trad) + (x_3d * C_3d)
+
+        # ----------------------------------------------------
+        # APRESENTAÇÃO DOS RESULTADOS
+        # ----------------------------------------------------
+        st.success("✅ Dimensionamento concluído com sucesso!")
+        
+        st.subheader("Resultados da Otimização")
+        res_col1, res_col2, res_col3 = st.columns(3)
+        
+        res_col1.metric("Peças Tradicionais (Base)", f"{x_trad_base} unid.", f"De {x_opt_trad} originais", delta_color="off")
+        res_col2.metric("Peças 3D (Tampão)", f"{x_3d} unid.")
+        res_col3.metric("Total de Peças", f"{x_trad_base + x_3d} unid.")
+        
+        st.divider()
+        
+        indicadores_col1, indicadores_col2, indicadores_col3 = st.columns(3)
+        indicadores_col1.metric("Valor Esperado Falhas (m ponderado)", f"{melhor_m:.2f}")
+        indicadores_col2.metric("Risco Obtido", f"{melhor_risco:.4%}")
+        indicadores_col3.metric("Custo Total Mínimo", f"R$ {melhor_custo:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        
+        df_resultado = pd.DataFrame({
+            "Tipo": ["Tradicional", "Impressão 3D"],
+            "Quantidade": [x_trad_base, x_3d],
+            "Custo Unitário (R$)": [C_trad, C_3d],
+            "Subtotal (R$)": [x_trad_base * C_trad, x_3d * C_3d]
+        })
+        st.dataframe(df_resultado, use_container_width=True, hide_index=True)
