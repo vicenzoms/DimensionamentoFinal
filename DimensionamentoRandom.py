@@ -380,7 +380,7 @@ if choice == menu[0]:
                 exibir_resumo_streamlit(df_n_analitico, Q_atual, "Aproximação Normal", texto_destaque="Quantidade Atual", mostrar_contexto=False)
             else:
                 st.subheader("Aproximação Normal")
-                st.warning("Aproximação pela Normal não recomendada (Lambda * n < 20).")
+                st.warning("Aproximação pela Normal não recomendada.")
 
 # ==========================================
 # MODO 2: OPTIMIZER (CÁLCULO DO VALOR ÓTIMO)
@@ -427,7 +427,7 @@ elif choice == menu[1]:
                 exibir_resumo_streamlit(df_n, x_n, "Aproximação Normal", mostrar_contexto=True)
             else:
                 st.subheader("Aproximação Normal")
-                st.warning("Aproximação pela Normal não recomendada (Lambda * n < 20).")
+                st.warning("Aproximação pela Normal não recomendada.")
 
 #  OPTIMIZER MA
 
