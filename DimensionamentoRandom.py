@@ -41,7 +41,6 @@ if not st.session_state.authenticated:
     st.markdown(
         f"""
         <style>
-        /* Oculta menus padrão do Streamlit no ecrã de login */
         html, body, [data-testid="stAppViewContainer"], .stApp {{
             height: 100%;
             overflow: hidden !important;
@@ -53,7 +52,6 @@ if not st.session_state.authenticated:
         .main, .stApp {{ background: transparent !important; }}
         .block-container {{ max-width: 100% !important; padding: 0 !important; margin: 0 !important; }}
 
-        /* Fundo claro com gradiente sobre a imagem */
         .login-bg-full {{
             position: fixed;
             inset: 0;
@@ -92,7 +90,7 @@ if not st.session_state.authenticated:
             font-size: 1.8rem;
             font-weight: 700;
             letter-spacing: -0.02em;
-            color: #388E3C; /* Verde Material */
+            color: #388E3C; 
             font-family: 'Roboto', sans-serif;
         }}
         
@@ -102,7 +100,6 @@ if not st.session_state.authenticated:
             margin-top: 5px;
         }}
 
-        /* Estilo do Cartão (Material Design Branco) */
         div[data-testid="stForm"] {{
             background: #ffffff !important;
             border-radius: 8px !important;
@@ -123,7 +120,6 @@ if not st.session_state.authenticated:
         }}
         div[data-testid="stForm"] input:focus {{ border-color: #388E3C !important; box-shadow: 0 0 0 1px #388E3C !important; }}
 
-        /* Botão Material Green */
         .stFormSubmitButton > button {{
             width: 100% !important;
             min-height: 2.8rem !important;
@@ -154,7 +150,6 @@ if not st.session_state.authenticated:
     st.markdown('<div class="login-bg-full"></div>', unsafe_allow_html=True)
     st.markdown('<div class="login-page-content">', unsafe_allow_html=True)
 
-    # Colunas para centralizar o formulário na tela
     col_vazia1, col_login, col_vazia2 = st.columns([1, 1.2, 1])
 
     with col_login:
@@ -185,7 +180,7 @@ if not st.session_state.authenticated:
     st.stop()  
 
 
-# CSS DA TELA PRINCIPAL (Pós-Login - Estilo Verde)
+# CSS DA TELA PRINCIPAL (Pós-Login)
 st.markdown("""
     <style>
     .stApp { background-color: #fdfdfd; }
@@ -284,9 +279,7 @@ def calcular_normal(lmbda, n, t, risco_alvo):
     return df, x_ideal, sigma
 
 def exibir_resumo_streamlit(df, x_alvo, titulo, texto_destaque="Quantidade Recomendada", mostrar_contexto=True):
-    """Exibe o DataFrame formatado. Se mostrar_contexto for False, exibe apenas a linha do x_alvo."""
     st.subheader(titulo)
-    
     if mostrar_contexto:
         idx_inicio = max(0, x_alvo - 1)
         resumo = df.iloc[idx_inicio : x_alvo + 2].copy()
@@ -315,13 +308,10 @@ menu = ["Analytical", "Optimizer", "Optimizer MA"]
 choice = st.sidebar.selectbox("Select here", menu)
 
 
-#  ANALYTICAL
-
+# 1. ANALYTICAL
 if choice == menu[0]:
     st.header(menu[0])
-    
     st.subheader("Avaliação da Situação Atual do Sistema")
-    st.write("Insira a quantidade de peças sobressalentes em uso e os parâmetros operacionais para calcular a margem de segurança e o custo atual.")
     
     Q_atual = st.number_input("Quantidade atual de peças Sobressalentes (x):", min_value=0, value=5, step=1)
     L = st.number_input("Lambda (taxa de falha):", min_value=0.0000, value=0.05, step=0.01, format="%.6f")
@@ -354,10 +344,8 @@ if choice == menu[0]:
         df_p_analitico = pd.DataFrame({'x': lista_x, 'P(X=x)': lista_p, 'Margem Seg.': lista_margem, 'Risco': lista_risco})
         
         col_t1, col_t2 = st.columns(2)
-        
         with col_t1:
             exibir_resumo_streamlit(df_p_analitico, Q_atual, "Distribuição de Poisson", texto_destaque="Quantidade Atual", mostrar_contexto=False)
-            
         with col_t2:
             if LG >= 20:
                 lista_x_n, lista_p_n, lista_margem_n, lista_risco_n = [], [], [], []
@@ -370,18 +358,15 @@ if choice == menu[0]:
                     lista_margem_n.append(prob_acum_n)
                     lista_risco_n.append(max(1 - prob_acum_n, 0.0))
                 df_n_analitico = pd.DataFrame({'x': lista_x_n, 'P(X=x)': lista_p_n, 'Margem Seg.': lista_margem_n, 'Risco': lista_risco_n})
-                
                 exibir_resumo_streamlit(df_n_analitico, Q_atual, "Aproximação Normal", texto_destaque="Quantidade Atual", mostrar_contexto=False)
             else:
                 st.subheader("Aproximação Normal")
                 st.warning("Aproximação pela Normal não recomendada.")
 
 
-# OPTIMIZER 
-
+# 2. OPTIMIZER 
 elif choice == menu[1]:
     st.header(menu[1])
-    
     st.subheader("Insert the parameter values below:")
     
     L = st.number_input("Lambda (taxa de falha):", min_value=0.0000, value=0.05, step=0.01, format="%.6f")
@@ -407,14 +392,11 @@ elif choice == menu[1]:
         col_m1.metric("Valor Esperado de Falhas (m)", f"{m_val:.2f}")
         col_m2.metric("Risco Alvo", f"{R_PCT}%")
         col_m3.metric("Custo Total (Inventário Ótimo)", f"R$ {custo_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-
         st.divider()
 
         col_tabela1, col_tabela2 = st.columns(2)
-        
         with col_tabela1:
             exibir_resumo_streamlit(df_p, x_p, "Distribuição de Poisson", mostrar_contexto=True)
-            
         with col_tabela2:
             if LG >= 20:
                 exibir_resumo_streamlit(df_n, x_n, "Aproximação Normal", mostrar_contexto=True)
@@ -423,13 +405,11 @@ elif choice == menu[1]:
                 st.warning("Aproximação pela Normal não recomendada.")
 
 
-#  OPTIMIZER MA (MANUTENÇÃO ADITIVA)
-
+# 3. OPTIMIZER MA (MANUTENÇÃO ADITIVA) - LOGICA CORRIGIDA
 elif choice == menu[2]:
     st.header(menu[2])
     st.subheader("Otimização Mix: Peças Originais + Impressão 3D")
     
-    # Organização das entradas por colunas para melhorar o design visual
     col_in1, col_in2, col_in3 = st.columns(3)
     
     with col_in1:
@@ -454,20 +434,18 @@ elif choice == menu[2]:
     
     if botao_ma:
         risco_alvo = R_PCT / 100.0
+        margem_alvo = 1.0 - risco_alvo
         
         # 1. Encontrar o x ótimo base do sistema convencional
         _, x_p_otimo, m_original = calcular_poisson(L, N, T, risco_alvo)
         
-        # 2. Definir a quantidade fixa de peças originais (metade de x ótimo)
+        # 2. Definir a metade de x (x/2) para as peças tradicionais fixas
         x_orig_fixo = int(x_p_otimo // 2)
         
-        # Calcular parâmetros esperados de falhas
-        m_3d = L_3d * N * T_3d
-        
+        # 3. Construir as fatias de probabilidade originais até a metade (x/2)
         lista_x, lista_tipo, lista_p, lista_margem, lista_risco = [], [], [], [], []
         prob_acumulada = 0.0
         
-        # Etapa A: Preenchimento com as peças originais até (x_p_otimo // 2)
         for x in range(x_orig_fixo + 1):
             p_x = poisson.pmf(x, m_original)
             prob_acumulada += p_x
@@ -478,26 +456,24 @@ elif choice == menu[2]:
             lista_margem.append(prob_acumulada)
             lista_risco.append(max(1.0 - prob_acumulada, 0.0))
             
-        # Risco residual remanescente após o término das peças originais
-        risco_residual = lista_risco[-1]
+        # Captura exatamente a margem atingida pelas originais (Ex: os 60% do seu exemplo)
+        margem_originais = prob_acumulada 
+        risco_residual = 1.0 - margem_originais # O que falta cobrir (Ex: os 40%)
         
-        # Etapa B: Preencher o restante do espaço amostral com peças 3D
+        # 4. Preencher o restante da margem com a confiabilidade das peças 3D
+        m_3d = L_3d * N * T_3d
         y = 1
         x_ideal_ma = x_orig_fixo
         
-        # Denominador para distribuição truncada (garante consistência a partir de y >= 1)
-        p0_3d = poisson.pmf(0, m_3d)
-        denom_3d = 1.0 - p0_3d if p0_3d < 1.0 else 1.0
-        
-        if risco_residual < risco_alvo:
+        if margem_originais >= margem_alvo:
             y_necessario = 0
         else:
             while True:
                 x_atual = x_orig_fixo + y
                 
-                # Probabilidade condicional ajustada para a confiabilidade da tecnologia 3D
-                p_cond_3d = poisson.pmf(y, m_3d) / denom_3d
-                p_absoluta_3d = risco_residual * p_cond_3d
+                # Pega a probabilidade discreta da peça 3D e escala pelo risco residual
+                p_3d = poisson.pmf(y - 1, m_3d)
+                p_absoluta_3d = risco_residual * p_3d
                 
                 prob_acumulada += p_absoluta_3d
                 risco_atual = max(1.0 - prob_acumulada, 0.0)
@@ -508,19 +484,20 @@ elif choice == menu[2]:
                 lista_margem.append(prob_acumulada)
                 lista_risco.append(risco_atual)
                 
-                if risco_atual < risco_alvo and x_ideal_ma == x_orig_fixo:
+                if prob_acumulada >= margem_alvo and x_ideal_ma == x_orig_fixo:
                     x_ideal_ma = x_atual
                     
-                # Condição de parada: passou do ponto ideal para exibição do contexto
-                if x_ideal_ma != x_orig_fixo and x_atual >= x_ideal_ma + 1:
+                # Condição de parada de exibição (2 linhas pós ponto ótimo para contexto visual)
+                if x_ideal_ma != x_orig_fixo and x_atual >= x_ideal_ma + 2:
                     break
+                
                 y += 1
-                if y > 200:  # Trava de segurança contra loops infinitos
+                if y > 500: # Trava de segurança
                     break
             
             y_necessario = x_ideal_ma - x_orig_fixo
 
-        # Construção do DataFrame de Resultados Combinados
+        # Gerar o DataFrame consolidado com o comportamento do Mix
         df_ma = pd.DataFrame({
             'x (Total)': lista_x,
             'Tipo de Alocação': lista_tipo,
@@ -529,30 +506,30 @@ elif choice == menu[2]:
             'Risco': lista_risco
         })
         
-        # Cálculos de custos financeiros
+        # Cálculos financeiros
         custo_orig_tot = x_orig_fixo * custo_unitario
         custo_3d_tot = y_necessario * custo_unitario_3d
         custo_combinado_total = custo_orig_tot + custo_3d_tot
         
-        # Painel Superior de Indicadores (Métricas)
-        st.subheader("Indicadores do Mix de Manutenção")
+        # Métricas na parte superior
+        st.subheader("Indicadores do Mix de Manutenção Aditiva")
         col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-        col_m1.metric("Valor Esperado Falhas (Orig)", f"{m_original:.2f}")
-        col_m2.metric("Valor Esperado Falhas (3D)", f"{m_3d:.2f}")
-        col_m3.metric("Risco Alvo Regulado", f"{R_PCT}%")
-        col_m4.metric("Custo Total Combinado", f"R$ {custo_combinado_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        col_m1.metric("X Ótimo Convencional", f"{x_p_otimo} un.")
+        col_m2.metric("Margem das Peças Originais", f"{margem_originais:.2%}")
+        col_m3.metric("Falta Suprir (3D)", f"{(margem_alvo - margem_originais):.2%}")
+        col_m4.metric("Custo Total Mix", f"R$ {custo_combinado_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
         
         st.divider()
         
-        # Mensagem formatada de recomendação final
+        # Painel de recomendação
         st.success(
-            f"**Composição Recomendada para o Estoque:** \n"
-            f"* **{x_orig_fixo}** peças em estoque físico de fábrica (**Originais**)\n"
-            f"* **{y_necessario}** peças programadas para contingência (**Impressão 3D**)\n"
-            f"   * *Totalizando uma proteção de {x_ideal_ma} unidades no portfólio.*"
+            f"**Composição Recomendada do Portfólio:** \n"
+            f"* **{x_orig_fixo}** peças físicas estocadas (**Originais**)\n"
+            f"* **{y_necessario}** peças a serem supridas por demanda (**Impressão 3D**)\n"
+            f"   * *Totalizando uma cobertura combinada de {x_ideal_ma} unidades.*"
         )
         
-        # Exibição do comportamento da curva de risco combinada
+        # Exibição da tabela explicativa
         st.subheader("Tabela de Evolução da Margem de Segurança Combinada")
         
         df_visualizacao = df_ma.copy()
@@ -560,4 +537,4 @@ elif choice == menu[2]:
         df_visualizacao['Margem Seg.'] = df_visualizacao['Margem Seg.'].apply(lambda v: f"{v:.4%}")
         df_visualizacao['Risco'] = df_visualizacao['Risco'].apply(lambda v: f"{v:.4%}")
         
-        st.dataframe(df_visualizacao, use_container_width=True, hide_index=True) 
+        st.dataframe(df_visualizacao, use_container_width=True, hide_index=True)
