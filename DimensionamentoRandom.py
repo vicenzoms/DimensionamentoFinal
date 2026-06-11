@@ -35,8 +35,8 @@ LOGO_HTML = f'<img src="data:image/png;base64,{LOGO_BASE64}" class="login-logo">
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
-# TELA DE LOGIN (Branca com Padrão Verde / Materialis)
-# ==========================================
+# TELA DE LOGIN 
+
 if not st.session_state.authenticated:
     st.markdown(
         f"""
@@ -288,11 +288,9 @@ def exibir_resumo_streamlit(df, x_alvo, titulo, texto_destaque="Quantidade Recom
     st.subheader(titulo)
     
     if mostrar_contexto:
-        # Pega a linha antes, a linha alvo e a linha depois para mostrar contexto (Usado no Optimizer)
         idx_inicio = max(0, x_alvo - 1)
         resumo = df.iloc[idx_inicio : x_alvo + 2].copy()
     else:
-        # Pega apenas a linha onde x é igual ao x_alvo (Usado no Analytical)
         resumo = df[df['x'] == x_alvo].copy()
     
     resumo['P(X=x)'] = resumo['P(X=x)'].apply(lambda v: f"{v:.4%}")
@@ -316,17 +314,16 @@ st.markdown("<h2 style='text-align: center; color: #388E3C;'>Spare Parts Invento
 menu = ["Analytical", "Optimizer", "Optimizer MA"]
 choice = st.sidebar.selectbox("Select here", menu)
 
-# ==========================================
-# MODO 1: ANALYTICAL (SITUAÇÃO ATUAL)
-# ==========================================
+
+#  ANALYTICAL
+
 if choice == menu[0]:
     st.header(menu[0])
     
     st.subheader("Avaliação da Situação Atual do Sistema")
     st.write("Insira a quantidade de peças sobressalentes em uso e os parâmetros operacionais para calcular a margem de segurança e o custo atual.")
     
-    # BARRAS DE INPUT
-    Q_atual = st.number_input("Quantidade atual de peças (Q):", min_value=0, value=5, step=1)
+    Q_atual = st.number_input("Quantidade atual de peças Sobressalentes (x):", min_value=0, value=5, step=1)
     L = st.number_input("Lambda (taxa de falha):", min_value=0.0000, value=0.05, step=0.01, format="%.6f")
     N = st.number_input("Número de máquinas ativas (n):", min_value=1, value=10, step=1)
     T = st.number_input("Tempo de reposição (t):", min_value=1, value=1, step=1)
@@ -345,7 +342,6 @@ if choice == menu[0]:
         col_m2.metric("Custo Total (Inventário Atual)", f"R$ {custo_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
         st.divider()
         
-        # Gerar DataFrame de Poisson até Q_atual para exibir na tabela
         lista_x, lista_p, lista_margem, lista_risco = [], [], [], []
         prob_acumulada = 0
         for x in range(Q_atual + 1):
@@ -357,7 +353,6 @@ if choice == menu[0]:
             lista_risco.append(max(1 - prob_acumulada, 0.0))
         df_p_analitico = pd.DataFrame({'x': lista_x, 'P(X=x)': lista_p, 'Margem Seg.': lista_margem, 'Risco': lista_risco})
         
-        # Exibição
         col_t1, col_t2 = st.columns(2)
         
         with col_t1:
@@ -365,7 +360,6 @@ if choice == menu[0]:
             
         with col_t2:
             if LG >= 20:
-                # Gerar DataFrame da Normal até Q_atual
                 lista_x_n, lista_p_n, lista_margem_n, lista_risco_n = [], [], [], []
                 sigma = np.sqrt(m_val)
                 for x in range(Q_atual + 1):
@@ -382,15 +376,14 @@ if choice == menu[0]:
                 st.subheader("Aproximação Normal")
                 st.warning("Aproximação pela Normal não recomendada.")
 
-# ==========================================
-# MODO 2: OPTIMIZER (CÁLCULO DO VALOR ÓTIMO)
-# ==========================================
+
+# OPTIMIZER 
+
 elif choice == menu[1]:
     st.header(menu[1])
     
     st.subheader("Insert the parameter values below:")
     
-    # BARRAS DE INPUT 
     L = st.number_input("Lambda (taxa de falha):", min_value=0.0000, value=0.05, step=0.01, format="%.6f")
     N = st.number_input("Número de máquinas ativas (n):", min_value=1, value=10, step=1)
     T = st.number_input("Tempo de reposição (t):", min_value=1, value=1, step=1)
@@ -429,9 +422,142 @@ elif choice == menu[1]:
                 st.subheader("Aproximação Normal")
                 st.warning("Aproximação pela Normal não recomendada.")
 
-#  OPTIMIZER MA
+
+#  OPTIMIZER MA (MANUTENÇÃO ADITIVA)
 
 elif choice == menu[2]:
     st.header(menu[2])
-    st.subheader("Otimização de Manutenção Aditiva (Impressão 3D)")
+    st.subheader("Otimização Mix: Peças Originais + Impressão 3D")
     
+    # Organização das entradas por colunas para melhorar o design visual
+    col_in1, col_in2, col_in3 = st.columns(3)
+    
+    with col_in1:
+        st.markdown("### Peça Original")
+        L = st.number_input("Lambda Original (λ):", min_value=0.0000, value=0.05, step=0.01, format="%.6f", key="L_ma")
+        T = st.number_input("Tempo de reposição Original (t):", min_value=1, value=1, step=1, key="T_ma")
+        custo_unitario = st.number_input("Custo Unitário Original (R$):", min_value=0.00, value=150.00, step=10.00, format="%.2f", key="cu_ma")
+        
+    with col_in2:
+        st.markdown("### Peça Impressa (3D)")
+        L_3d = st.number_input("Lambda Peça 3D (λ 3D):", min_value=0.0000, value=0.08, step=0.01, format="%.6f")
+        T_3d = st.number_input("Tempo de Impressão (t 3D):", min_value=1, value=1, step=1)
+        custo_unitario_3d = st.number_input("Custo Unitário Impressão (R$):", min_value=0.00, value=50.00, step=10.00, format="%.2f")
+        
+    with col_in3:
+        st.markdown("### Sistema Global")
+        N = st.number_input("Número de máquinas ativas (n):", min_value=1, value=10, step=1, key="N_ma")
+        R_PCT = st.number_input("Risco Alvo (%):", min_value=0.01, max_value=99.99, value=5.00, step=1.0, format="%.2f", key="R_ma")
+
+    st.subheader("Clique no botão abaixo para processar a Otimização Aditiva:")    
+    botao_ma = st.button("Calcular Dimensionamento MA")
+    
+    if botao_ma:
+        risco_alvo = R_PCT / 100.0
+        
+        # 1. Encontrar o x ótimo base do sistema convencional
+        _, x_p_otimo, m_original = calcular_poisson(L, N, T, risco_alvo)
+        
+        # 2. Definir a quantidade fixa de peças originais (metade de x ótimo)
+        x_orig_fixo = int(x_p_otimo // 2)
+        
+        # Calcular parâmetros esperados de falhas
+        m_3d = L_3d * N * T_3d
+        
+        lista_x, lista_tipo, lista_p, lista_margem, lista_risco = [], [], [], [], []
+        prob_acumulada = 0.0
+        
+        # Etapa A: Preenchimento com as peças originais até (x_p_otimo // 2)
+        for x in range(x_orig_fixo + 1):
+            p_x = poisson.pmf(x, m_original)
+            prob_acumulada += p_x
+            
+            lista_x.append(x)
+            lista_tipo.append("Original")
+            lista_p.append(p_x)
+            lista_margem.append(prob_acumulada)
+            lista_risco.append(max(1.0 - prob_acumulada, 0.0))
+            
+        # Risco residual remanescente após o término das peças originais
+        risco_residual = lista_risco[-1]
+        
+        # Etapa B: Preencher o restante do espaço amostral com peças 3D
+        y = 1
+        x_ideal_ma = x_orig_fixo
+        
+        # Denominador para distribuição truncada (garante consistência a partir de y >= 1)
+        p0_3d = poisson.pmf(0, m_3d)
+        denom_3d = 1.0 - p0_3d if p0_3d < 1.0 else 1.0
+        
+        if risco_residual < risco_alvo:
+            y_necessario = 0
+        else:
+            while True:
+                x_atual = x_orig_fixo + y
+                
+                # Probabilidade condicional ajustada para a confiabilidade da tecnologia 3D
+                p_cond_3d = poisson.pmf(y, m_3d) / denom_3d
+                p_absoluta_3d = risco_residual * p_cond_3d
+                
+                prob_acumulada += p_absoluta_3d
+                risco_atual = max(1.0 - prob_acumulada, 0.0)
+                
+                lista_x.append(x_atual)
+                lista_tipo.append("Impressão 3D")
+                lista_p.append(p_absoluta_3d)
+                lista_margem.append(prob_acumulada)
+                lista_risco.append(risco_atual)
+                
+                if risco_atual < risco_alvo and x_ideal_ma == x_orig_fixo:
+                    x_ideal_ma = x_atual
+                    
+                # Condição de parada: passou do ponto ideal para exibição do contexto
+                if x_ideal_ma != x_orig_fixo and x_atual >= x_ideal_ma + 1:
+                    break
+                y += 1
+                if y > 200:  # Trava de segurança contra loops infinitos
+                    break
+            
+            y_necessario = x_ideal_ma - x_orig_fixo
+
+        # Construção do DataFrame de Resultados Combinados
+        df_ma = pd.DataFrame({
+            'x (Total)': lista_x,
+            'Tipo de Alocação': lista_tipo,
+            'P(X=x)': lista_p,
+            'Margem Seg.': lista_margem,
+            'Risco': lista_risco
+        })
+        
+        # Cálculos de custos financeiros
+        custo_orig_tot = x_orig_fixo * custo_unitario
+        custo_3d_tot = y_necessario * custo_unitario_3d
+        custo_combinado_total = custo_orig_tot + custo_3d_tot
+        
+        # Painel Superior de Indicadores (Métricas)
+        st.subheader("Indicadores do Mix de Manutenção")
+        col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+        col_m1.metric("Valor Esperado Falhas (Orig)", f"{m_original:.2f}")
+        col_m2.metric("Valor Esperado Falhas (3D)", f"{m_3d:.2f}")
+        col_m3.metric("Risco Alvo Regulado", f"{R_PCT}%")
+        col_m4.metric("Custo Total Combinado", f"R$ {custo_combinado_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        
+        st.divider()
+        
+        # Mensagem formatada de recomendação final
+        st.success(
+            f"**Composição Recomendada para o Estoque:** \n"
+            f"* **{x_orig_fixo}** peças em estoque físico de fábrica (**Originais**)\n"
+            f"* **{y_necessario}** peças programadas para contingência (**Impressão 3D**)\n"
+            f"   * *Totalizando uma proteção de {x_ideal_ma} unidades no portfólio.*"
+        )
+        
+        # Exibição do comportamento da curva de risco combinada
+        st.subheader("Tabela de Evolução da Margem de Segurança Combinada")
+        
+        df_visualizacao = df_ma.copy()
+        df_visualizacao['P(X=x)'] = df_visualizacao['P(X=x)'].apply(lambda v: f"{v:.4%}")
+        df_visualizacao['Margem Seg.'] = df_visualizacao['Margem Seg.'].apply(lambda v: f"{v:.4%}")
+        df_visualizacao['Risco'] = df_visualizacao['Risco'].apply(lambda v: f"{v:.4%}")
+        
+        st.dataframe(df_visualizacao, use_container_width=True, hide_index=True) 
