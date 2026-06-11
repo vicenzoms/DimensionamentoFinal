@@ -429,7 +429,7 @@ elif choice == menu[2]:
     st.header(menu[2])
     
     st.subheader("Otimizador Híbrido: Peças Tradicionais + Peças Aditivas (Impressão 3D)")
-    st.write("Esta ferramenta calcula o dimensionamento de um sistema misto, fixando as peças tradicionais exatamente na metade do ideal determinado pelo algoritmo de Poisson convencional.")
+    st.write("Esta ferramenta calcula o dimensionamento isolando a lacuna de segurança como um novo sistema independente (o novo 100%) e preenchendo-o com o auxílio exclusivo de peças aditivas.")
     
     # Inputs do Sistema Híbrido
     L_t = st.number_input("Lambda Tradicional (taxa de falha original):", min_value=0.0000, value=0.05, step=0.01, format="%.6f")
@@ -451,49 +451,66 @@ elif choice == menu[2]:
     
     if botao_ma:
         risco_alvo = R_PCT / 100.0
+        margem_alvo = 1.0 - risco_alvo
         
-        # 1. Encontrar o x_puro utilizando EXATAMENTE a mesma função calcular_poisson do Optimizer
+        # 1. Encontrar o ótimo tradicional exato do Optimizer (x_puro)
         _, x_puro, m_t = calcular_poisson(L_t, N, T, risco_alvo)
         
-        # 2. Fixar as tradicionais em metade do valor ideal encontrado
+        # 2. Fixar as tradicionais em metade da base
         x_trad = int(x_puro // 2)
         
-        # 3. Calcular o risco residual exato de Poisson que restou ao reduzir o estoque tradicional para x_trad
-        # Usamos 1 - cdf para saber a probabilidade de falhas excederem o estoque de tradicionais
-        risco_residual = max(1 - poisson.cdf(x_trad, m_t), 0.0) if x_trad >= 0 else 1.0
+        # 3. Calcular a margem que as tradicionais sozinhas entregam
+        margem_trad = poisson.cdf(x_trad, m_t)
         
-        # 4. Encontrar as aditivas necessárias usando o tempo de impressão T_a
+        # 4. Determinar o Intervalo (A lacuna vira o "novo 100%")
+        intervalo = margem_alvo - margem_trad
+        
+        # 5. Adicionar peças aditivas para preencher o intervalo
         m_a = L_a * N * T_a
-        Q_a = 1 - np.exp(-m_a)
-        
         m_ideal = 0
-        while True:
-            risco_atual = risco_residual * (Q_a ** m_ideal)
-            if risco_atual <= risco_alvo:
-                break
-            m_ideal += 1
-            if m_ideal > 1000:  # Trava de segurança contra loops infinitos
-                break
         
+        if intervalo > 0:
+            m_ideal = 1  # Se há lacuna, precisamos testar a partir de 1 peça
+            
+            # A meta de preenchimento aplica a exigência de segurança (M_alvo) sobre o "novo 100%" (o intervalo)
+            meta_preenchimento = intervalo * margem_alvo
+            
+            while True:
+                # O quanto de confiabilidade as m_ideal peças aditivas geram
+                confiabilidade_aditiva = poisson.cdf(m_ideal, m_a)
+                
+                # Proporção do intervalo que foi efetivamente preenchida por elas
+                preenchimento_atual = intervalo * confiabilidade_aditiva
+                
+                # O loop para assim que atingirmos a meta de segurança estipulada para a lacuna
+                if preenchimento_atual >= meta_preenchimento:
+                    break
+                
+                m_ideal += 1
+                
+                # Trava de segurança no While Loop
+                if m_ideal > 1000:
+                    break
+                    
         # Cálculos Econômicos
         custo_puro_total = x_puro * custo_t
         custo_hibrido_total = (x_trad * custo_t) + (m_ideal * custo_a)
         economia = custo_puro_total - custo_hibrido_total
         
-        # Exibição Final Limpa (Apenas Métricas solicitadas, sem tabelas)
+        # Exibição Final Limpa
         st.divider()
         st.subheader("Resultados Finais do Dimensionamento Híbrido")
         
         col_r1, col_r2 = st.columns(2)
-        col_r1.metric("Peças Tradicionais Necessárias", f"{x_trad} peças", help=f"Calculado como metade do estoque ótimo puro tradicional ({x_puro} peças).")
-        col_r2.metric("Peças Aditivas Necessárias (Impressão 3D)", f"{m_ideal} peças")
+        col_r1.metric("Peças Tradicionais Necessárias", f"{x_trad} peças", help=f"O modelo ótimo exigia {x_puro} peças tradicionais.")
+        col_r2.metric("Peças Aditivas (Impressão 3D)", f"{m_ideal} peças")
         
         col_r3, col_r4 = st.columns(2)
         col_r3.metric("Custo Total (Sistema Híbrido)", f"R$ {custo_hibrido_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
         
         if economia > 0:
             col_r4.metric("Economia Estimada", f"R$ {economia:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-            st.success(f"**Conclusão:** O estoque híbrido gerou uma redução de custos de **{(economia/custo_puro_total)*100:.1f}%** frente ao modelo convencional puro.")
+            st.success(f"**Conclusão:** O estoque híbrido gerou uma redução de custos de **{(economia/custo_puro_total)*100:.1f}%** frente ao modelo convencional puro, preenchendo a lacuna de segurança integralmente.")
         elif economia == 0:
             col_r4.metric("Economia Estimada", "R$ 0,00")
             st.info("O custo financeiro do estoque híbrido empatou com o sistema tradicional.")
