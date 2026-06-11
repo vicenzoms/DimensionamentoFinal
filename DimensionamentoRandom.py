@@ -326,7 +326,7 @@ if choice == menu[0]:
     Q_atual = st.number_input("Quantidade atual de peças Sobressalentes (x):", min_value=0, value=5, step=1)
     L = st.number_input("Lambda (taxa de falha):", min_value=0.0000, value=0.05, step=0.01, format="%.6f")
     N = st.number_input("Número de máquinas ativas (n):", min_value=1, value=10, step=1)
-    T = st.number_input("Tempo de reposição (t):", min_value=1, value=1, step=1)
+    T = st.number_input("Tempo de reposição (t):", min_value=1.0, value=1.0, step=1.0)
     custo_unitario = st.number_input("Custo Unitário por Peça (R$):", min_value=0.00, value=150.00, step=10.00, format="%.2f")
     
     botao_analytical = st.button("Calcular Situação Atual")
@@ -386,7 +386,7 @@ elif choice == menu[1]:
     
     L = st.number_input("Lambda (taxa de falha):", min_value=0.0000, value=0.05, step=0.01, format="%.6f")
     N = st.number_input("Número de máquinas ativas (n):", min_value=1, value=10, step=1)
-    T = st.number_input("Tempo de reposição (t):", min_value=1, value=1, step=1)
+    T = st.number_input("Tempo de reposição (t):", min_value=1.0, value=1.0, step=1.0)
     R_PCT = st.number_input("Risco Alvo (%):", min_value=0.01, max_value=99.99, value=5.00, step=1.0, format="%.2f")
     custo_unitario = st.number_input("Custo Unitário por Peça (R$):", min_value=0.00, value=150.00, step=10.00, format="%.2f")
 
@@ -429,13 +429,17 @@ elif choice == menu[2]:
     st.header(menu[2])
     
     st.subheader("Otimizador Híbrido: Peças Tradicionais + Peças Aditivas (Impressão 3D)")
-    st.write("Esta ferramenta calcula o dimensionamento de um sistema misto. O número de peças tradicionais é fixado em exatamente metade do ideal de um sistema puro ($x/2$). O sistema então calcula via Poisson quantas peças aditivas são necessárias para restabelecer a margem de segurança alvo.")
+    st.write("Esta ferramenta calcula o dimensionamento de um sistema misto, fixando as peças tradicionais na metade do ideal e utilizando o tempo de impressão para avaliar o risco de reposição das peças aditivas.")
     
-    # Inputs adicionais para Manufatura Aditiva
+    # Inputs para Manufatura Aditiva
     L_t = st.number_input("Lambda Tradicional (taxa de falha original):", min_value=0.0000, value=0.05, step=0.01, format="%.6f")
     L_a = st.number_input("Lambda Aditivo (taxa de falha da peça impressa):", min_value=0.0000, value=0.08, step=0.01, format="%.6f")
     N = st.number_input("Número de máquinas ativas (n):", min_value=1, value=10, step=1)
-    T = st.number_input("Tempo de missão/reposição (t):", min_value=1, value=1, step=1)
+    
+    col_t1, col_t2 = st.columns(2)
+    T = col_t1.number_input("Tempo de reposição tradicional (t):", min_value=0.1, value=1.0, step=0.5, format="%.2f")
+    T_a = col_t2.number_input("Tempo de impressão da peça aditiva (t_a):", min_value=0.01, value=0.50, step=0.10, format="%.2f")
+    
     R_PCT = st.number_input("Risco Alvo (%):", min_value=0.01, max_value=99.99, value=5.00, step=1.0, format="%.2f")
     
     col_c1, col_c2 = st.columns(2)
@@ -448,84 +452,61 @@ elif choice == menu[2]:
     if botao_ma:
         risco_alvo = R_PCT / 100.0
         
-        # 1. Encontrar x_puro (Sistema puro tradicional usando Poisson)
+        # 1. Encontrar x_puro (Sistema puro tradicional)
         m_t = L_t * N * T
         R_t = np.exp(-m_t)
         Q_t = 1 - R_t
         
         x_puro = 0
         while True:
-            if (Q_t ** x_puro) < risco_alvo:
+            if (Q_t ** x_puro) <= risco_alvo:
                 break
             x_puro += 1
-            if x_puro > 100:  # Trava de segurança para o loop
+            if x_puro > 1000:  # Trava de segurança
                 break
                 
-        # 2. Aplicar a sua regra: Número fixo de tradicionais = metade do ótimo tradicional (x_puro // 2)
+        # 2. Fixar tradicionais em x_puro // 2
         x_trad = int(x_puro // 2)
         
-        # 3. Calcular o risco residual gerado por usar apenas metade das tradicionais
-        risco_residual = Q_t ** x_trad
+        # 3. Risco residual apenas com as tradicionais
+        risco_residual = Q_t ** x_trad if x_trad > 0 else 1.0
         
-        # 4. Encontrar por Poisson a quantidade 'm' de peças aditivas para cobrir a lacuna
-        m_a = L_a * N * T
+        # 4. Encontrar 'm' usando o TEMPO DE IMPRESSÃO (t_a) na equação de Poisson
+        m_a = L_a * N * T_a
         R_a = np.exp(-m_a)
         Q_a = 1 - R_a
         
-        m_adit = 0
-        lista_m, lista_risco, lista_margem = [], [], []
-        m_ideal = -1
-        
-        # Loop de progresso para a tabela
+        m_ideal = 0
         while True:
-            risco_atual = risco_residual * (Q_a ** m_adit)
-            margem_atual = 1 - risco_atual
-            
-            lista_m.append(m_adit)
-            lista_risco.append(risco_atual)
-            lista_margem.append(margem_atual)
-            
-            if risco_atual < risco_alvo and m_ideal == -1:
-                m_ideal = m_adit
-                
-            if m_ideal != -1 and m_adit >= m_ideal + 2:
+            risco_atual = risco_residual * (Q_a ** m_ideal)
+            if risco_atual <= risco_alvo:
                 break
-            m_adit += 1
-            if m_adit > 100:
+            m_ideal += 1
+            if m_ideal > 1000: # Trava de segurança
                 break
         
-        # DataFrame de saída
-        df_ma = pd.DataFrame({
-            'Peças Aditivas (m)': lista_m,
-            'Margem Seg. (Sistema Híbrido)': lista_margem,
-            'Risco Atual': lista_risco
-        })
-        
-        # Cálculos de custos e viabilidade financeira
+        # Cálculos de custos e viabilidade
         custo_puro_total = x_puro * custo_t
         custo_hibrido_total = (x_trad * custo_t) + (m_ideal * custo_a)
         economia = custo_puro_total - custo_hibrido_total
         
-        # Exibição dos resultados em Métricas
-        st.subheader("Resultados do Dimensionamento")
-        col_m1, col_m2, col_m3 = st.columns(3)
-        col_m1.metric("Peças Tradicionais (Fixadas em x/2)", f"{x_trad} de {x_puro} originais")
-        col_m2.metric("Peças Aditivas Necessárias (m)", f"{m_ideal} peças")
-        col_m3.metric("Custo Total do Sistema Híbrido", f"R$ {custo_hibrido_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-        
-        # Destaque de Economia Financeira
-        if economia > 0:
-            st.info(f"**Economia Estimada:** R$ {economia:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") + f" (Redução de {(economia/custo_puro_total)*100:.1f}% nos custos de inventário)")
-        else:
-            st.warning(f"O modelo híbrido atual gerou um custo extra de R$ {abs(economia):,.2f}. Avalie os custos unitários das peças aditivas.")
-
+        # Exibição dos resultados finais (Sem as tabelas)
         st.divider()
-        st.subheader("Tabela de Progressão do Risco Híbrido")
-        st.write(f"Abaixo veja como o sistema se comporta mantendo fixas as **{x_trad}** peças tradicionais e adicionando as peças manufaturadas aditivamente:")
+        st.subheader("Resultados Finais do Dimensionamento")
         
-        # Formatação das porcentagens para exibição na tabela
-        df_exibicao = df_ma.copy()
-        df_exibicao['Margem Seg. (Sistema Híbrido)'] = df_exibicao['Margem Seg. (Sistema Híbrido)'].apply(lambda v: f"{v:.4%}")
-        df_exibicao['Risco Atual'] = df_exibicao['Risco Atual'].apply(lambda v: f"{v:.4%}")
+        col_r1, col_r2 = st.columns(2)
+        col_r1.metric("Peças Tradicionais (x/2)", f"{x_trad} peças", help=f"Originalmente seriam necessárias {x_puro} peças no sistema puro.")
+        col_r2.metric("Peças Aditivas Necessárias", f"{m_ideal} peças")
         
-        st.dataframe(df_exibicao, use_container_width=True, hide_index=True)
+        col_r3, col_r4 = st.columns(2)
+        col_r3.metric("Custo Total (Sistema Híbrido)", f"R$ {custo_hibrido_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        
+        if economia > 0:
+            col_r4.metric("Economia Estimada", f"R$ {economia:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            st.success(f"**Conclusão:** O uso de impressão 3D reduziu o custo de inventário em **{(economia/custo_puro_total)*100:.1f}%**, mantendo rigorosamente a mesma margem de segurança de {100-R_PCT}%.")
+        elif economia == 0:
+            col_r4.metric("Economia Estimada", "R$ 0,00")
+            st.info("O custo do sistema híbrido empatou com o custo do sistema puramente tradicional.")
+        else:
+            col_r4.metric("Custo Adicional", f"R$ {abs(economia):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            st.warning("Neste cenário, o modelo híbrido ficou mais caro que o estoque tradicional. Considere reavaliar o tempo de impressão ou os custos unitários.")
