@@ -505,7 +505,7 @@ elif choice == menu[2]:
         col_r2.metric("Peças Aditivas (Impressão 3D)", f"{m_ideal} peças")
         
         col_r3, col_r4 = st.columns(2)
-        col_r3.metric("Custo Total (Sistema Híbrido)", f"R$ {custo_hibrido_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        col_r3.metric("Custo Total"), f"R$ {custo_hibrido_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
         
         if economia > 0:
             col_r4.metric("Economia Estimada", f"R$ {economia:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
