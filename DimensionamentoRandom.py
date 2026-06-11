@@ -429,7 +429,6 @@ elif choice == menu[2]:
     st.header(menu[2])
     
     st.subheader("Otimizador Híbrido: Peças Tradicionais + Peças Aditivas (Impressão 3D)")
-    st.write("Esta ferramenta calcula o dimensionamento isolando a lacuna de segurança como um novo sistema independente (o novo 100%) e preenchendo-o com o auxílio exclusivo de peças aditivas.")
     
     # Inputs do Sistema Híbrido
     L_t = st.number_input("Lambda Tradicional (taxa de falha original):", min_value=0.0000, value=0.05, step=0.01, format="%.6f")
@@ -438,7 +437,7 @@ elif choice == menu[2]:
     
     col_t1, col_t2 = st.columns(2)
     T = col_t1.number_input("Tempo de reposição tradicional (t):", min_value=0.1, value=1.0, step=0.5, format="%.2f")
-    T_a = col_t2.number_input("Tempo de impressão da peça aditiva (t_a):", min_value=0.01, value=0.50, step=0.10, format="%.2f")
+    T_a = col_t2.number_input("Tempo de impressão da peça aditiva (t_a):", min_value=0.01, value=0.50, step=0.10, format="%.4f")
     
     R_PCT = st.number_input("Risco Alvo (%):", min_value=0.01, max_value=99.99, value=5.00, step=1.0, format="%.2f")
     
