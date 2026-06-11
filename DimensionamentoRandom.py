@@ -428,7 +428,7 @@ elif choice == menu[1]:
 elif choice == menu[2]:
     st.header(menu[2])
     
-    st.subheader("Otimizador Híbrido: Peças Tradicionais + Peças Aditivas (Impressão 3D)")
+    st.subheader("Peças Tradicionais + Peças Aditivas (Impressão 3D)")
     
     # Inputs do Sistema Híbrido
     L_t = st.number_input("Lambda Tradicional (taxa de falha original):", min_value=0.0000, value=0.05, step=0.01, format="%.6f")
@@ -446,7 +446,7 @@ elif choice == menu[2]:
     custo_a = col_c2.number_input("Custo Unitário Aditivo (R$):", min_value=0.00, value=50.00, step=10.00, format="%.2f")
 
     st.subheader("Clique no botão abaixo para executar o dimensionamento:")    
-    botao_ma = st.button("Calcular Dimensionamento Híbrido")        
+    botao_ma = st.button("Calcular Dimensionamento")        
     
     if botao_ma:
         risco_alvo = R_PCT / 100.0
