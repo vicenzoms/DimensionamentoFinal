@@ -429,9 +429,9 @@ elif choice == menu[2]:
     st.header(menu[2])
     
     st.subheader("Otimizador Híbrido: Peças Tradicionais + Peças Aditivas (Impressão 3D)")
-    st.write("Esta ferramenta calcula o dimensionamento de um sistema misto, fixando as peças tradicionais na metade do ideal e utilizando o tempo de impressão para avaliar o risco de reposição das peças aditivas.")
+    st.write("Esta ferramenta calcula o dimensionamento de um sistema misto, fixando as peças tradicionais exatamente na metade do ideal determinado pelo algoritmo de Poisson convencional.")
     
-    # Inputs para Manufatura Aditiva
+    # Inputs do Sistema Híbrido
     L_t = st.number_input("Lambda Tradicional (taxa de falha original):", min_value=0.0000, value=0.05, step=0.01, format="%.6f")
     L_a = st.number_input("Lambda Aditivo (taxa de falha da peça impressa):", min_value=0.0000, value=0.08, step=0.01, format="%.6f")
     N = st.number_input("Número de máquinas ativas (n):", min_value=1, value=10, step=1)
@@ -452,29 +452,19 @@ elif choice == menu[2]:
     if botao_ma:
         risco_alvo = R_PCT / 100.0
         
-        # 1. Encontrar x_puro (Sistema puro tradicional)
-        m_t = L_t * N * T
-        R_t = np.exp(-m_t)
-        Q_t = 1 - R_t
+        # 1. Encontrar o x_puro utilizando EXATAMENTE a mesma função calcular_poisson do Optimizer
+        _, x_puro, m_t = calcular_poisson(L_t, N, T, risco_alvo)
         
-        x_puro = 0
-        while True:
-            if (Q_t ** x_puro) <= risco_alvo:
-                break
-            x_puro += 1
-            if x_puro > 1000:  # Trava de segurança
-                break
-                
-        # 2. Fixar tradicionais em x_puro // 2
+        # 2. Fixar as tradicionais em metade do valor ideal encontrado
         x_trad = int(x_puro // 2)
         
-        # 3. Risco residual apenas com as tradicionais
-        risco_residual = Q_t ** x_trad if x_trad > 0 else 1.0
+        # 3. Calcular o risco residual exato de Poisson que restou ao reduzir o estoque tradicional para x_trad
+        # Usamos 1 - cdf para saber a probabilidade de falhas excederem o estoque de tradicionais
+        risco_residual = max(1 - poisson.cdf(x_trad, m_t), 0.0) if x_trad >= 0 else 1.0
         
-        # 4. Encontrar 'm' usando o TEMPO DE IMPRESSÃO (t_a) na equação de Poisson
+        # 4. Encontrar as aditivas necessárias usando o tempo de impressão T_a
         m_a = L_a * N * T_a
-        R_a = np.exp(-m_a)
-        Q_a = 1 - R_a
+        Q_a = 1 - np.exp(-m_a)
         
         m_ideal = 0
         while True:
@@ -482,31 +472,31 @@ elif choice == menu[2]:
             if risco_atual <= risco_alvo:
                 break
             m_ideal += 1
-            if m_ideal > 1000: # Trava de segurança
+            if m_ideal > 1000:  # Trava de segurança contra loops infinitos
                 break
         
-        # Cálculos de custos e viabilidade
+        # Cálculos Econômicos
         custo_puro_total = x_puro * custo_t
         custo_hibrido_total = (x_trad * custo_t) + (m_ideal * custo_a)
         economia = custo_puro_total - custo_hibrido_total
         
-        # Exibição dos resultados finais (Sem as tabelas)
+        # Exibição Final Limpa (Apenas Métricas solicitadas, sem tabelas)
         st.divider()
-        st.subheader("Resultados Finais do Dimensionamento")
+        st.subheader("Resultados Finais do Dimensionamento Híbrido")
         
         col_r1, col_r2 = st.columns(2)
-        col_r1.metric("Peças Tradicionais (x/2)", f"{x_trad} peças", help=f"Originalmente seriam necessárias {x_puro} peças no sistema puro.")
-        col_r2.metric("Peças Aditivas Necessárias", f"{m_ideal} peças")
+        col_r1.metric("Peças Tradicionais Necessárias", f"{x_trad} peças", help=f"Calculado como metade do estoque ótimo puro tradicional ({x_puro} peças).")
+        col_r2.metric("Peças Aditivas Necessárias (Impressão 3D)", f"{m_ideal} peças")
         
         col_r3, col_r4 = st.columns(2)
         col_r3.metric("Custo Total (Sistema Híbrido)", f"R$ {custo_hibrido_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
         
         if economia > 0:
             col_r4.metric("Economia Estimada", f"R$ {economia:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-            st.success(f"**Conclusão:** O uso de impressão 3D reduziu o custo de inventário em **{(economia/custo_puro_total)*100:.1f}%**, mantendo rigorosamente a mesma margem de segurança de {100-R_PCT}%.")
+            st.success(f"**Conclusão:** O estoque híbrido gerou uma redução de custos de **{(economia/custo_puro_total)*100:.1f}%** frente ao modelo convencional puro.")
         elif economia == 0:
             col_r4.metric("Economia Estimada", "R$ 0,00")
-            st.info("O custo do sistema híbrido empatou com o custo do sistema puramente tradicional.")
+            st.info("O custo financeiro do estoque híbrido empatou com o sistema tradicional.")
         else:
-            col_r4.metric("Custo Adicional", f"R$ {abs(economia):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-            st.warning("Neste cenário, o modelo híbrido ficou mais caro que o estoque tradicional. Considere reavaliar o tempo de impressão ou os custos unitários.")
+            col_r4.metric("Custo Extra Gerado", f"R$ {abs(economia):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            st.warning("O custo unitário ou tempo de impressão da peça aditiva inviabilizou financeiramente o modelo híbrido neste cenário.")
