@@ -288,11 +288,9 @@ def exibir_resumo_streamlit(df, x_alvo, titulo, texto_destaque="Quantidade Recom
     st.subheader(titulo)
     
     if mostrar_contexto:
-        # Pega a linha antes, a linha alvo e a linha depois para mostrar contexto (Usado no Optimizer)
         idx_inicio = max(0, x_alvo - 1)
         resumo = df.iloc[idx_inicio : x_alvo + 2].copy()
     else:
-        # Pega apenas a linha onde x é igual ao x_alvo (Usado no Analytical)
         resumo = df[df['x'] == x_alvo].copy()
     
     resumo['P(X=x)'] = resumo['P(X=x)'].apply(lambda v: f"{v:.4%}")
@@ -325,7 +323,6 @@ if choice == menu[0]:
     st.subheader("Avaliação da Situação Atual do Sistema")
     st.write("Insira a quantidade de peças sobressalentes em uso e os parâmetros operacionais para calcular a margem de segurança e o custo atual.")
     
-    # BARRAS DE INPUT
     Q_atual = st.number_input("Quantidade atual de peças Sobressalentes (x):", min_value=0, value=5, step=1)
     L = st.number_input("Lambda (taxa de falha):", min_value=0.0000, value=0.05, step=0.01, format="%.6f")
     N = st.number_input("Número de máquinas ativas (n):", min_value=1, value=10, step=1)
@@ -345,7 +342,6 @@ if choice == menu[0]:
         col_m2.metric("Custo Total (Inventário Atual)", f"R$ {custo_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
         st.divider()
         
-        # Gerar DataFrame de Poisson até Q_atual para exibir na tabela
         lista_x, lista_p, lista_margem, lista_risco = [], [], [], []
         prob_acumulada = 0
         for x in range(Q_atual + 1):
@@ -357,7 +353,6 @@ if choice == menu[0]:
             lista_risco.append(max(1 - prob_acumulada, 0.0))
         df_p_analitico = pd.DataFrame({'x': lista_x, 'P(X=x)': lista_p, 'Margem Seg.': lista_margem, 'Risco': lista_risco})
         
-        # Exibição
         col_t1, col_t2 = st.columns(2)
         
         with col_t1:
@@ -365,7 +360,6 @@ if choice == menu[0]:
             
         with col_t2:
             if LG >= 20:
-                # Gerar DataFrame da Normal até Q_atual
                 lista_x_n, lista_p_n, lista_margem_n, lista_risco_n = [], [], [], []
                 sigma = np.sqrt(m_val)
                 for x in range(Q_atual + 1):
@@ -390,7 +384,6 @@ elif choice == menu[1]:
     
     st.subheader("Insert the parameter values below:")
     
-    # BARRAS DE INPUT 
     L = st.number_input("Lambda (taxa de falha):", min_value=0.0000, value=0.05, step=0.01, format="%.6f")
     N = st.number_input("Número de máquinas ativas (n):", min_value=1, value=10, step=1)
     T = st.number_input("Tempo de reposição (t):", min_value=1, value=1, step=1)
@@ -430,8 +423,109 @@ elif choice == menu[1]:
                 st.warning("Aproximação pela Normal não recomendada.")
 
 
-#  OPTIMIZER MA
+#  OPTIMIZER MA (MANUFATURA ADITIVA / HÍBRIDO)
 
 elif choice == menu[2]:
     st.header(menu[2])
-    st.info(" Este modo ainda não está disponível.")
+    
+    st.subheader("Otimizador Híbrido: Peças Tradicionais + Peças Aditivas (Impressão 3D)")
+    st.write("Esta ferramenta calcula o dimensionamento de um sistema misto. O número de peças tradicionais é fixado em exatamente metade do ideal de um sistema puro ($x/2$). O sistema então calcula via Poisson quantas peças aditivas são necessárias para restabelecer a margem de segurança alvo.")
+    
+    # Inputs adicionais para Manufatura Aditiva
+    L_t = st.number_input("Lambda Tradicional (taxa de falha original):", min_value=0.0000, value=0.05, step=0.01, format="%.6f")
+    L_a = st.number_input("Lambda Aditivo (taxa de falha da peça impressa):", min_value=0.0000, value=0.08, step=0.01, format="%.6f")
+    N = st.number_input("Número de máquinas ativas (n):", min_value=1, value=10, step=1)
+    T = st.number_input("Tempo de missão/reposição (t):", min_value=1, value=1, step=1)
+    R_PCT = st.number_input("Risco Alvo (%):", min_value=0.01, max_value=99.99, value=5.00, step=1.0, format="%.2f")
+    
+    col_c1, col_c2 = st.columns(2)
+    custo_t = col_c1.number_input("Custo Unitário Tradicional (R$):", min_value=0.00, value=150.00, step=10.00, format="%.2f")
+    custo_a = col_c2.number_input("Custo Unitário Aditivo (R$):", min_value=0.00, value=50.00, step=10.00, format="%.2f")
+
+    st.subheader("Clique no botão abaixo para executar o dimensionamento:")    
+    botao_ma = st.button("Calcular Dimensionamento Híbrido")        
+    
+    if botao_ma:
+        risco_alvo = R_PCT / 100.0
+        
+        # 1. Encontrar x_puro (Sistema puro tradicional usando Poisson)
+        m_t = L_t * N * T
+        R_t = np.exp(-m_t)
+        Q_t = 1 - R_t
+        
+        x_puro = 0
+        while True:
+            if (Q_t ** x_puro) < risco_alvo:
+                break
+            x_puro += 1
+            if x_puro > 100:  # Trava de segurança para o loop
+                break
+                
+        # 2. Aplicar a sua regra: Número fixo de tradicionais = metade do ótimo tradicional (x_puro // 2)
+        x_trad = int(x_puro // 2)
+        
+        # 3. Calcular o risco residual gerado por usar apenas metade das tradicionais
+        risco_residual = Q_t ** x_trad
+        
+        # 4. Encontrar por Poisson a quantidade 'm' de peças aditivas para cobrir a lacuna
+        m_a = L_a * N * T
+        R_a = np.exp(-m_a)
+        Q_a = 1 - R_a
+        
+        m_adit = 0
+        lista_m, lista_risco, lista_margem = [], [], []
+        m_ideal = -1
+        
+        # Loop de progresso para a tabela
+        while True:
+            risco_atual = risco_residual * (Q_a ** m_adit)
+            margem_atual = 1 - risco_atual
+            
+            lista_m.append(m_adit)
+            lista_risco.append(risco_atual)
+            lista_margem.append(margem_atual)
+            
+            if risco_atual < risco_alvo and m_ideal == -1:
+                m_ideal = m_adit
+                
+            if m_ideal != -1 and m_adit >= m_ideal + 2:
+                break
+            m_adit += 1
+            if m_adit > 100:
+                break
+        
+        # DataFrame de saída
+        df_ma = pd.DataFrame({
+            'Peças Aditivas (m)': lista_m,
+            'Margem Seg. (Sistema Híbrido)': lista_margem,
+            'Risco Atual': lista_risco
+        })
+        
+        # Cálculos de custos e viabilidade financeira
+        custo_puro_total = x_puro * custo_t
+        custo_hibrido_total = (x_trad * custo_t) + (m_ideal * custo_a)
+        economia = custo_puro_total - custo_hibrido_total
+        
+        # Exibição dos resultados em Métricas
+        st.subheader("Resultados do Dimensionamento")
+        col_m1, col_m2, col_m3 = st.columns(3)
+        col_m1.metric("Peças Tradicionais (Fixadas em x/2)", f"{x_trad} de {x_puro} originais")
+        col_m2.metric("Peças Aditivas Necessárias (m)", f"{m_ideal} peças")
+        col_m3.metric("Custo Total do Sistema Híbrido", f"R$ {custo_hibrido_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        
+        # Destaque de Economia Financeira
+        if economia > 0:
+            st.info(f"**Economia Estimada:** R$ {economia:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") + f" (Redução de {(economia/custo_puro_total)*100:.1f}% nos custos de inventário)")
+        else:
+            st.warning(f"O modelo híbrido atual gerou um custo extra de R$ {abs(economia):,.2f}. Avalie os custos unitários das peças aditivas.")
+
+        st.divider()
+        st.subheader("Tabela de Progressão do Risco Híbrido")
+        st.write(f"Abaixo veja como o sistema se comporta mantendo fixas as **{x_trad}** peças tradicionais e adicionando as peças manufaturadas aditivamente:")
+        
+        # Formatação das porcentagens para exibição na tabela
+        df_exibicao = df_ma.copy()
+        df_exibicao['Margem Seg. (Sistema Híbrido)'] = df_exibicao['Margem Seg. (Sistema Híbrido)'].apply(lambda v: f"{v:.4%}")
+        df_exibicao['Risco Atual'] = df_exibicao['Risco Atual'].apply(lambda v: f"{v:.4%}")
+        
+        st.dataframe(df_exibicao, use_container_width=True, hide_index=True)
